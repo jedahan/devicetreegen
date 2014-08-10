@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+    <title>Beaglebone Device Tree Generator</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <style type="text/css">
+    textarea { font-size: 11px; }
+    </style>
+  </head>
+
+  <body>
+
+  
+
+    <div class="container">
+
+      <div class="col-md-12">
+        <h1>Beaglebone Device Tree Generator</h1>
+        <p class="lead">The device tree is kind of a pain. Let's make generating one easier.</p>
+      </div>
+
+      <div class="col-md-6">
+        <h3>Parameters</h3>
+        <p>
+        <label for="bbb-name">Your Device Tree Name <small>(Use alphanumeric and -)</small></label>
+        <input id="bbb-name" class="form-control" value="test-overlay" /></p>
+        <p>
+          <label for="bbb-pins">Pin Selection</label>
+          <select id="bbb-pins" class="form-control"></select> 
+          <label for="bbb-mode">Pin Mode <small>(Not yet implemented, defaults to 7, GPIO)</small></label>
+          <select id="bbb-mode" class="form-control"></select> 
+          <label for="bbb-state">Pin State</label>
+          <select id="bbb-state" class="form-control">
+            <option value="0x07">OUTPUT</option>
+            <option value="0x2F">INPUT (none)</option>
+            <option value="0x37">INPUT (pullup)</option>
+            <option value="0x27">INPUT (pulldown)</option>
+          </select> 
+        </p>
+        <p><button id="add-pin" class="btn btn-primary">Add Pin</button></p>
+        <p>
+        <h3>Selected Pins</h3>
+        <p>Click to remove one.</p>
+        <ul id="myPins">
+        </ul>
+        </p>
+        </div>
+
+        <div class="col-md-6">
+        <h3>Results</h3>
+        <p><textarea class="form-control" id="bbb-overlay" rows="30">
+        </textarea></p>
+        </div>
+        <div class="col-md-12">
+        <h3>Instructions</h3>
+        <p>
+          If you need it, install the patched version of dtc, it should be installed to /usr/local/bin/dtc
+          <blockquote>
+          wget raw.githubusercontent.com/RobertCNelson/tools/master/pkgs/dtc.sh<br />
+          chmod +x dtc.sh<br />
+          ./dtc.sh<br />
+          </blockquote>
+        </p>
+          <p>Compile your overlay!</p>
+          <blockquote>
+            dtc -O dtb -o YOUR-TREE-00A0.dtbo -b 0 -@ YOUR-TREE-00A0.dts <br />
+            cp YOUR-TREE-00A0.dtbo /lib/firmware<br />
+          </blockquote>
+          <p>Export it
+          <blockquote>
+              echo YOUR-TREE > /sys/devices/bone_capemgr.8/slots<br />
+          </blockquote>
+        </p>
+
+      </div>
+
+    </div><!-- /.container -->
+
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="./bone.js"></script>
+    <script type="text/javascript">
+
+    var selectedPins = { };
+    var gpioModes = { '0x07':'OUTPUT','0x2F':'INPUT','0x27':'INPUT (PULLDOWN)','0x37':'INPUT (PULLUP)'};
+
+    // fill pins select
+    for(var i in pins) {
+      $("#bbb-pins").append("<option>"+i+"</option>");
+    }
+
+    // on drop down change
+    $("#bbb-pins").on("change",function() {
+        var selected = $("#bbb-pins option:selected").val();
+        $("#bbb-mode").html(pins[selected].options.map(function(val,key) { return "<option value='" + key + "'>" + val + "</option>"; }));
+
+    });
+
+    // on click add pin
+    $("#add-pin").on("click",function() {
+
+      // set to state
+      selectedPins[$("#bbb-pins option:selected").text()]=$("#bbb-state option:selected").val();
+      console.log("Added "+$("#bbb-pins option:selected").val());
+
+      genList();
+      genText();
+      
+
+    });
+
+    $("#myPins").on('click','li',function() {
+      delete selectedPins[this.id];
+      $(this.id).remove();
+      genList();
+      genText();
+    });
+
+    // grab the device tree overlay template
+    var genText = function() {
+      $.get('./template.txt',function(data) {
+        
+        var replacement_pins ="";
+        var replacement_excl =[];
+
+        // for each selected pin
+        for(var q in selectedPins) {
+          if(pins[q].muxRegOffset != undefined) {
+            replacement_pins += "\t\t"+pins[q].muxRegOffset +" "+selectedPins[q]+"\t /* "+ q + " " + gpioModes[selectedPins[q]] +" MODE7 */\r\n";
+            replacement_excl.push(q.replace("_","."));
+          }
+        }
+        // replace <<<name>>>, <<<pins>>> and <<<exclusive>>>
+        data = data.replace("<<<name>>>",$("#bbb-name")).replace("<<<pins>>>",replacement_pins).replace("<<<exclusive>>>",replacement_excl.map(function(i) { return '"'+i+'"'; }).join(","));
+        $("#bbb-overlay").text(data);
+      });
+    };
+    
+    // regenerate selected pins list
+    var genList = function() {
+      $("#myPins").html("");
+      for(var i in selectedPins) {
+        $("#myPins").append("<li id='"+i+"'>"+i+" <span class='glyphicon glyphicon-remove'></span></li>");
+      }
+    };
+
+    </script>
+  </body>
+</html>
