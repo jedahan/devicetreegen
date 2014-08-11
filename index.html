@@ -150,7 +150,7 @@
           }
         }
         // replace <<<name>>>, <<<pins>>> and <<<exclusive>>>
-        data = data.replace("<<<name>>>",$("#bbb-name")).replace("<<<pins>>>",replacement_pins).replace("<<<exclusive>>>",replacement_excl.map(function(i) { return '"'+i+'"'; }).join(","));
+        data = data.replace("<<<name>>>",$("#bbb-name").val()).replace("<<<pins>>>",replacement_pins).replace("<<<exclusive>>>",replacement_excl.map(function(i) { return '"'+i+'"'; }).join(","));
         $("#bbb-overlay").text(data);
       });
     };
