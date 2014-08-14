@@ -1,9 +1,9 @@
 Device Tree Fun
 ------------
 
-The device tree is annoying to work with sometimes. Lets generate one!
+The Beaglebone Black is an amazing device, but the device tree can be really annoying to work with sometimes. Lets generate one!
 
-I put this together quickly, testing, help and improvements are very welcome.
+This was put together VERY quickly, and presently only supports GPIO 'mode7' --- testing, help and improvements are very welcome.
 
 Components used:
 
